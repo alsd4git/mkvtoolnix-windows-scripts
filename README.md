@@ -1,33 +1,44 @@
-# MKVToolNixScriptCollection
-a collection of simple windows (command prompt) scripts i currently use to manage my media files (mostly movies/tv shows)
+# MKVToolNix Windows Scripts
 
-DISCLAIMER: i am not responsible for your files, a misuse of these scripts may overwrite your media, pay attention when you type something, also keep in mind that these scripts work with the idea that the "MKVToolNix" software is installed on your machine and its executables are already added to your PATH variable, a simple google search for "how to add a folder to my windows path" may clarify if you are not familiar with these concept
+> Formerly **MKVToolNixScriptCollection**.
 
-**Scripts List:**
-# 0. install.bat
-- you need MKVToolnix installed (should work on both 64/32bit, win7+, tested on win10/64bit) it needs admin privilege to check for your MKVToolNIx installation, add script files there and add everything to path
-- if you don't have MKVToolNIx installed you can download it from here: https://mkvtoolnix.download/downloads.html#windows
+Windows Command Prompt utilities for remuxing video files and managing MKV
+cover art with [MKVToolNix](https://mkvtoolnix.download/).
 
-# 1. ALLtoMKV
-- it takes all video files in the current folder and "converts" them into mkv format files (no encoding, just container change) it's useful if you want to make some order in your files list.
-- current considered file formats are:
-  - .avi 
-  - .mp4 
-  - .flv 
-  - .mpg 
-  - .mpeg 
-  - .rmvb 
-  - .ts 
-  - .mov
+## Requirements
 
-the usage is just ``` ALLtoMKV ``` typed in your folder with an open command prompt if you have the script in your PATH, otherwise you have to copy it to your working folder to use it
+- Windows 10 or later
+- MKVToolNix installed and available on `PATH`
 
-# 2. mkvAddCover
-- this one is used to add covers to your already existing MKV files _(pay attention, it deletes every jpg and png file in the folder after its execution as cleanup)_ it looks for a generic "cover.jpg" or "cover.png" to add it to all the video files in the working directory, if you have a tv show for example it works good like this, you can also add cover to your movies collection with a structure like "movie_name.mkv" and "movie_name.jpg" where the jpeg file is obviously the cover of the movie, the script will rename the file "cover.jpg", and attach it
+## Safety
 
-the usage is just ``` mkvAddCover ``` typed in your folder with an open command prompt if you have the script in your PATH, otherwise you have to copy it to your working folder to use it
+These scripts modify media files in place. Test them on copies first and keep
+backups of your library. `mkvAddCover.bat` also removes JPEG and PNG files as
+part of its cleanup step.
 
-# 3. toMKV
-- this is just a simple command to pack a single video file into an MKV container, it takes your original file name as a parameter and create an equivalent Matroska file (no encoding, just container change)
+## Scripts
 
-the usage is just ``` toMKV filename.ext ``` where _filename.ext_ is a supported video file (it will produce an equivalent _filename.mkv_) typed in your folder with an open command prompt if you have the script in your PATH, otherwise you have to copy it to your working folder to use it
+### `install.bat`
+
+Installs the helper scripts next to MKVToolNix and adds them to `PATH`. Run it
+from an elevated Command Prompt.
+
+### `ALLtoMKV.bat`
+
+Remuxes supported video files into MKV without re-encoding. Supported inputs:
+
+- `.avi`, `.mp4`, `.flv`, `.mpg`, `.mpeg`, `.rmvb`, `.ts`, and `.mov`
+
+Run `ALLtoMKV` from the directory containing the media files.
+
+### `mkvAddCover.bat`
+
+Adds a generic `cover.jpg` or `cover.png` to every MKV in the current directory,
+or matches `movie_name.jpg` to `movie_name.mkv`. It deletes JPEG and PNG files
+after completing its cleanup step.
+
+## License
+
+The repository's batch scripts are MIT licensed; see [LICENSE](LICENSE).
+`scripts/tee.exe` is a third-party executable and is not covered by that
+license; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
