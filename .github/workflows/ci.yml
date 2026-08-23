@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Create an isolated MKVToolNix stub
+        shell: pwsh
+        run: |
+          @'
+          @echo off
+          echo %*>>"%RUNNER_TEMP%\mkvmerge-arguments.txt"
+          exit /b 0
+          '@ | Set-Content -Path "$env:RUNNER_TEMP\mkvmerge.cmd" -Encoding ascii
+
+      - name: Smoke-test single-file conversion
+        shell: cmd
+        run: |
+          set "PATH=%RUNNER_TEMP%;%PATH%"
+          call scripts\toMKV.bat "sample video.mp4"
+
+      - name: Smoke-test empty-directory batch conversion
+        shell: cmd
+        run: |
+          set "PATH=%RUNNER_TEMP%;%CD%\scripts;%PATH%"
+          call scripts\ALLtoMKV.bat
+
+      - name: Verify the stub was invoked safely
+        shell: pwsh
+        run: |
+          $arguments = Get-Content "$env:RUNNER_TEMP\mkvmerge-arguments.txt"
+          if ($arguments -notmatch 'sample video') {
+            throw "The single-file script did not pass the input path to mkvmerge."
+          }
