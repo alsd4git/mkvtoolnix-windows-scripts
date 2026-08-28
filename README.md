@@ -29,13 +29,28 @@ Remuxes supported video files into MKV without re-encoding. Supported inputs:
 
 - `.avi`, `.mp4`, `.flv`, `.mpg`, `.mpeg`, `.rmvb`, `.ts`, and `.mov`
 
-Run `ALLtoMKV` from the directory containing the media files.
+Run `ALLtoMKV` from the directory containing the media files. When `tee` is available, each successful source file and its temporary log are deleted after the MKV is created. Files that produce warnings or errors are retained and listed in `_ReadMeMkvErrorsAndWarnings.log`.
+
+### `toMKV.bat`
+
+Remuxes one file into MKV without re-encoding. Pass the source path as the first argument:
+
+```bat
+toMKV "D:\Videos\example.mp4"
+```
+
+The source file is retained. If an MKV with the same base name already exists, `mkvmerge` decides whether the command can proceed.
 
 ### `mkvAddCover.bat`
 
 Adds a generic `cover.jpg` or `cover.png` to every MKV in the current directory,
 or matches `movie_name.jpg` to `movie_name.mkv`. It deletes JPEG and PNG files
 after completing its cleanup step.
+
+```bat
+cd /d D:\Videos\Movie
+mkvAddCover
+```
 
 ## License
 
