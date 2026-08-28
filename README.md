@@ -1,5 +1,7 @@
 # MKVToolNix Windows Scripts
 
+[![CI](https://github.com/alsd4git/mkvtoolnix-windows-scripts/actions/workflows/ci.yml/badge.svg)](https://github.com/alsd4git/mkvtoolnix-windows-scripts/actions/workflows/ci.yml)
+
 > Formerly **MKVToolNixScriptCollection**.
 
 Windows Command Prompt utilities for remuxing video files and managing MKV
