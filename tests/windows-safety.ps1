@@ -52,7 +52,8 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        string tool = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+        string tool = Path.GetFileNameWithoutExtension(Environment.ProcessPath
+            ?? throw new InvalidOperationException("Missing process path"));
         string prefix = tool.Equals("mkvmerge", StringComparison.OrdinalIgnoreCase)
             ? "MKVMERGE"
             : "MKVPROPEDIT";
@@ -279,3 +280,7 @@ finally {
         Remove-Item -Path $testRoot -Recurse -Force
     }
 }
+
+# Expected command failures are asserted above; do not leak the final stub's
+# nonzero LASTEXITCODE into the GitHub Actions PowerShell wrapper.
+exit 0
