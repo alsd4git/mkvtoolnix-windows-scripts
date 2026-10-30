@@ -23,7 +23,10 @@ set "foundInput="
 set "failed="
 for %%A in (*.avi *.mp4 *.flv *.mpg *.mpeg *.rmvb *.ts *.mov) do if exist "%%~fA" (
     set "foundInput=1"
-    call :processFile "%%~fA"
+    set "source=%%~fA"
+    set "output=%%~dpnA.mkv"
+    set "log=%%~dpnA.mkvmerge.log"
+    call :processFile
     if errorlevel 1 set "failed=1"
 )
 
@@ -32,10 +35,6 @@ if defined failed exit /b 1
 exit /b 0
 
 :processFile
-set "source=%~1"
-set "output=%~dpn1.mkv"
-set "log=%~dpn1.mkvmerge.log"
-
 if exist "%output%" (
     echo Skipping "%source%": output "%output%" already exists.
     exit /b 1

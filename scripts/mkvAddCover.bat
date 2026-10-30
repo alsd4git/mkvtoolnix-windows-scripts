@@ -11,7 +11,9 @@ set "foundMkv="
 set "failed="
 for %%M in (*.mkv) do if exist "%%~fM" (
     set "foundMkv=1"
-    call :attachCover "%%~fM"
+    set "mkvPath=%%~fM"
+    set "basePath=%%~dpnM"
+    call :attachCover
     if errorlevel 1 set "failed=1"
 )
 
@@ -23,8 +25,6 @@ if defined failed exit /b 1
 exit /b 0
 
 :attachCover
-set "mkvPath=%~1"
-set "basePath=%~dpn1"
 set "coverPath="
 if exist "%basePath%.png" set "coverPath=%basePath%.png"
 if not defined coverPath if exist "%basePath%.jpg" set "coverPath=%basePath%.jpg"

@@ -2,7 +2,10 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $testRoot = Join-Path $env:RUNNER_TEMP ("mkv-safety-tests-{0}" -f [guid]::NewGuid())
-$toolsPath = Join-Path $testRoot 'stub tools'
+$mergeToolsPath = Join-Path $testRoot 'mkvmerge stub'
+$editToolsPath = Join-Path $testRoot 'mkvpropedit stub'
+$stubProjectPath = Join-Path $testRoot 'stub.csproj'
+$stubSourcePath = Join-Path $testRoot 'Program.cs'
 $mergeLog = Join-Path $testRoot 'mkvmerge-arguments.txt'
 $editLog = Join-Path $testRoot 'mkvpropedit-arguments.txt'
 $originalPath = $env:Path
@@ -23,34 +26,86 @@ function New-WorkingDirectory([string]$Name) {
 function Invoke-Batch([string]$ScriptPath, [string[]]$Arguments = @()) {
     $quotedArguments = ($Arguments | ForEach-Object { '"{0}"' -f $_ }) -join ' '
     $commandLine = 'call "{0}" {1}' -f $ScriptPath, $quotedArguments
-    & $env:ComSpec /d /c $commandLine
+    & $env:ComSpec /d /c $commandLine | Out-Host
     return $LASTEXITCODE
 }
 
 try {
     New-Item -ItemType Directory -Path $testRoot | Out-Null
-    New-Item -ItemType Directory -Path $toolsPath | Out-Null
+    New-Item -ItemType Directory -Path $mergeToolsPath | Out-Null
+    New-Item -ItemType Directory -Path $editToolsPath | Out-Null
     @'
-@echo off
-if not defined MKVMERGE_EXIT_CODE set "MKVMERGE_EXIT_CODE=0"
->>"%MKVMERGE_LOG%" echo %*
-if "%MKVMERGE_EXIT_CODE%"=="2" exit /b 2
-if "%MKVMERGE_NO_OUTPUT%"=="1" exit /b 0
->"%~2" echo synthetic output
-exit /b %MKVMERGE_EXIT_CODE%
-'@ | Set-Content -Path (Join-Path $toolsPath 'mkvmerge.cmd') -Encoding ascii
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+'@ | Set-Content -Path $stubProjectPath -Encoding ascii
     @'
-@echo off
-if not defined MKVPROPEDIT_EXIT_CODE set "MKVPROPEDIT_EXIT_CODE=0"
->>"%MKVPROPEDIT_LOG%" echo %*
-exit /b %MKVPROPEDIT_EXIT_CODE%
-'@ | Set-Content -Path (Join-Path $toolsPath 'mkvpropedit.cmd') -Encoding ascii
+using System;
+using System.IO;
 
-    $env:Path = "$toolsPath;$originalPath"
+internal static class Program
+{
+    private static int Main(string[] args)
+    {
+        string tool = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+        string prefix = tool.Equals("mkvmerge", StringComparison.OrdinalIgnoreCase)
+            ? "MKVMERGE"
+            : "MKVPROPEDIT";
+        string logPath = Environment.GetEnvironmentVariable(prefix + "_LOG")!;
+        File.AppendAllText(logPath, string.Join("|", args) + Environment.NewLine);
+
+        int exitCode = int.TryParse(Environment.GetEnvironmentVariable(prefix + "_EXIT_CODE"), out int parsed)
+            ? parsed
+            : 0;
+        if (prefix == "MKVPROPEDIT")
+        {
+            return exitCode;
+        }
+
+        if (exitCode == 2)
+        {
+            return exitCode;
+        }
+        if (Environment.GetEnvironmentVariable("MKVMERGE_NO_OUTPUT") == "1")
+        {
+            return 0;
+        }
+
+        string outputPath = args[1];
+        if (Environment.GetEnvironmentVariable("MKVMERGE_EMPTY_OUTPUT") == "1")
+        {
+            File.WriteAllBytes(outputPath, Array.Empty<byte>());
+        }
+        else
+        {
+            File.WriteAllText(outputPath, "synthetic output");
+        }
+        return exitCode;
+    }
+}
+'@ | Set-Content -Path $stubSourcePath -Encoding ascii
+
+    & dotnet publish $stubProjectPath --configuration Release --framework net8.0 --output $mergeToolsPath -p:AssemblyName=mkvmerge
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to build the mkvmerge test stub.'
+    }
+    & dotnet publish $stubProjectPath --configuration Release --framework net8.0 --output $editToolsPath -p:AssemblyName=mkvpropedit
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Failed to build the mkvpropedit test stub.'
+    }
+
+    $env:Path = "$mergeToolsPath;$editToolsPath;$originalPath"
     $env:MKVMERGE_LOG = $mergeLog
     $env:MKVPROPEDIT_LOG = $editLog
     $env:MKVMERGE_EXIT_CODE = '0'
     $env:MKVPROPEDIT_EXIT_CODE = '0'
+    $env:MKVMERGE_NO_OUTPUT = '0'
+    $env:MKVMERGE_EMPTY_OUTPUT = '0'
 
     $defaultDirectory = New-WorkingDirectory 'default success'
     $defaultSource = Join-Path $defaultDirectory 'sample video.mp4'
@@ -67,11 +122,20 @@ exit /b %MKVPROPEDIT_EXIT_CODE%
     $secondSource = Join-Path $multipleDirectory 'second.mp4'
     Set-Content -Path $firstMultipleSource -Value 'synthetic source'
     Set-Content -Path $secondSource -Value 'synthetic source'
+    $specialSourceNames = @('percent%PATH%.mp4', 'bang!.mp4', 'amp&ersand.mp4', 'caret^.mp4')
+    foreach ($name in $specialSourceNames) {
+        Set-Content -Path (Join-Path $multipleDirectory $name) -Value 'synthetic source'
+    }
     Set-Location $multipleDirectory
     $result = Invoke-Batch (Join-Path $repoRoot 'scripts\ALLtoMKV.bat')
     Assert-That ($result -eq 0) 'Batch conversion should process multiple inputs.'
     Assert-That ((Test-Path $firstMultipleSource) -and (Test-Path (Join-Path $multipleDirectory 'first.mkv'))) 'Batch conversion did not retain and convert the first input.'
     Assert-That ((Test-Path $secondSource) -and (Test-Path (Join-Path $multipleDirectory 'second.mkv'))) 'Batch conversion did not retain and convert the second input.'
+    foreach ($name in $specialSourceNames) {
+        $sourcePath = Join-Path $multipleDirectory $name
+        $outputPath = Join-Path $multipleDirectory ([IO.Path]::ChangeExtension($name, '.mkv'))
+        Assert-That ((Test-Path $sourcePath) -and (Test-Path $outputPath)) "Special-character input was not handled safely: $name"
+    }
 
     $deleteDirectory = New-WorkingDirectory 'explicit deletion'
     $deleteSource = Join-Path $deleteDirectory 'delete me.mp4'
@@ -115,6 +179,16 @@ exit /b %MKVPROPEDIT_EXIT_CODE%
     Assert-That (Test-Path $missingOutputSource) 'A missing output caused source deletion.'
     $env:MKVMERGE_NO_OUTPUT = '0'
 
+    $emptyOutputDirectory = New-WorkingDirectory 'empty output'
+    $emptyOutputSource = Join-Path $emptyOutputDirectory 'empty output.mp4'
+    Set-Content -Path $emptyOutputSource -Value 'synthetic source'
+    Set-Location $emptyOutputDirectory
+    $env:MKVMERGE_EMPTY_OUTPUT = '1'
+    $result = Invoke-Batch (Join-Path $repoRoot 'scripts\ALLtoMKV.bat') @('--delete-source')
+    Assert-That ($result -ne 0) 'An empty output should be reported as failure.'
+    Assert-That (Test-Path $emptyOutputSource) 'An empty output caused source deletion.'
+    $env:MKVMERGE_EMPTY_OUTPUT = '0'
+
     $collisionDirectory = New-WorkingDirectory 'output collision'
     $collisionSource = Join-Path $collisionDirectory 'collision.mp4'
     $existingOutput = Join-Path $collisionDirectory 'collision.mkv'
@@ -141,9 +215,13 @@ exit /b %MKVPROPEDIT_EXIT_CODE%
     $coverMkv = Join-Path $coverDirectory 'movie with spaces.mkv'
     $matchedCover = Join-Path $coverDirectory 'movie with spaces.png'
     $unrelatedImage = Join-Path $coverDirectory 'unrelated.png'
+    $specialCoverMkv = Join-Path $coverDirectory 'movie %TEMP%! &^.mkv'
+    $specialCover = Join-Path $coverDirectory 'movie %TEMP%! &^.jpg'
     Set-Content -Path $coverMkv -Value 'synthetic MKV placeholder'
     Set-Content -Path $matchedCover -Value 'synthetic cover'
     Set-Content -Path $unrelatedImage -Value 'keep unrelated image'
+    Set-Content -Path $specialCoverMkv -Value 'synthetic MKV placeholder'
+    Set-Content -Path $specialCover -Value 'synthetic cover'
     Set-Location $coverDirectory
     $result = Invoke-Batch (Join-Path $repoRoot 'scripts\mkvAddCover.bat')
     Assert-That ($result -eq 0) 'Cover attachment should succeed with the command stub.'
@@ -151,6 +229,7 @@ exit /b %MKVPROPEDIT_EXIT_CODE%
     $editArguments = Get-Content $editLog -Raw
     Assert-That ($editArguments.Contains($coverMkv) -and $editArguments.Contains($matchedCover)) 'The per-file cover or MKV path was not passed to mkvpropedit.'
     Assert-That ($editArguments.Contains('--attachment-name "cover.png"')) 'Per-file artwork was not attached with the standard cover filename.'
+    Assert-That ($editArguments.Contains($specialCoverMkv) -and $editArguments.Contains($specialCover)) 'Special-character artwork paths were not passed safely to mkvpropedit.'
 
     $genericDirectory = New-WorkingDirectory 'generic cover'
     $genericMkv = Join-Path $genericDirectory 'no matching image.mkv'
@@ -194,6 +273,7 @@ finally {
     Remove-Item Env:MKVPROPEDIT_LOG -ErrorAction SilentlyContinue
     Remove-Item Env:MKVMERGE_EXIT_CODE -ErrorAction SilentlyContinue
     Remove-Item Env:MKVMERGE_NO_OUTPUT -ErrorAction SilentlyContinue
+    Remove-Item Env:MKVMERGE_EMPTY_OUTPUT -ErrorAction SilentlyContinue
     Remove-Item Env:MKVPROPEDIT_EXIT_CODE -ErrorAction SilentlyContinue
     if (Test-Path $testRoot) {
         Remove-Item -Path $testRoot -Recurse -Force
