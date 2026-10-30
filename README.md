@@ -14,9 +14,14 @@ cover art with [MKVToolNix](https://mkvtoolnix.download/).
 
 ## Safety
 
-These scripts modify media files in place. Test them on copies first and keep
-backups of your library. `mkvAddCover.bat` also removes JPEG and PNG files as
-part of its cleanup step.
+`ALLtoMKV.bat` keeps source videos by default and refuses to overwrite an
+existing MKV or log. Source deletion is available only through the explicit
+`--delete-source` option, and only after `mkvmerge` exits successfully and
+creates a non-empty MKV. Keep backups before modifying a media library.
+
+`mkvAddCover.bat` never deletes or renames artwork. It attaches the selected
+image directly to each MKV and names the attachment `cover.jpg` or
+`cover.png`.
 
 ## Scripts
 
@@ -31,7 +36,23 @@ Remuxes supported video files into MKV without re-encoding. Supported inputs:
 
 - `.avi`, `.mp4`, `.flv`, `.mpg`, `.mpeg`, `.rmvb`, `.ts`, and `.mov`
 
-Run `ALLtoMKV` from the directory containing the media files. When `tee` is available, each successful source file and its temporary log are deleted after the MKV is created. Files that produce warnings or errors are retained and listed in `_ReadMeMkvErrorsAndWarnings.log`.
+Run `ALLtoMKV` from the directory containing the media files. Each input gets
+a `.mkvmerge.log` file, which is kept for review. Existing output or log files
+are not overwritten. The default command keeps every source file:
+
+```bat
+ALLtoMKV
+```
+
+To remove a source only after a verified successful remux, explicitly opt in:
+
+```bat
+ALLtoMKV --delete-source
+```
+
+Warnings and errors reported through a non-zero `mkvmerge` exit status keep the
+source. The script exits with a non-zero status if any input fails or is
+skipped because of a collision.
 
 ### `toMKV.bat`
 
@@ -45,9 +66,10 @@ The source file is retained. If an MKV with the same base name already exists, `
 
 ### `mkvAddCover.bat`
 
-Adds a generic `cover.jpg` or `cover.png` to every MKV in the current directory,
-or matches `movie_name.jpg` to `movie_name.mkv`. It deletes JPEG and PNG files
-after completing its cleanup step.
+Attaches artwork to each MKV in the current directory. For each file it selects
+the first available image in this order: matching `movie_name.png`, matching
+`movie_name.jpg`, generic `cover.png`, then generic `cover.jpg`. If no image is
+available, that MKV is skipped. All images are retained, including on failure.
 
 ```bat
 cd /d D:\Videos\Movie

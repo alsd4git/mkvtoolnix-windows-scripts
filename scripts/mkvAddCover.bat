@@ -1,40 +1,46 @@
-:: clean output
 @echo off
+setlocal EnableExtensions DisableDelayedExpansion
 
-echo 	"Warning" every jpg and png file in this folder will be deleted at the 
-echo 	end of this process, press ctrl+c to stop now, enter to go on
-pause 
-
-::if png
-for %%m in (*.mkv) do ( 
-copy "cover.png" "REALLY_cover.png"
-copy "%%~nm.png" "cover.png"
-:: attrib -r :: removes read-only
-attrib -r %%m
-mkvpropedit "%%m" --add-attachment "cover.png" 
-move "REALLY_cover.png" "cover.png"
+where mkvpropedit >nul 2>&1
+if errorlevel 1 (
+    echo mkvpropedit was not found on PATH.
+    exit /b 1
 )
 
-::if jpg
-for %%m in (*.mkv) do ( 
-copy "cover.jpg" "REALLY_cover.jpg"
-copy "%%~nm.jpg" "cover.jpg"
-:: attrib -r :: removes read-only
-attrib -r %%m
-mkvpropedit "%%m" --add-attachment "cover.jpg" 
-move "REALLY_cover.jpg" "cover.jpg"
+set "foundMkv="
+set "failed="
+for %%M in (*.mkv) do if exist "%%~fM" (
+    set "foundMkv=1"
+    call :attachCover "%%~fM"
+    if errorlevel 1 set "failed=1"
 )
 
-:: clean up
-::toDo improve clean up removing only cover related images
-del *.jpg 2>nul
-del *.png 2>nul
+if not defined foundMkv (
+    echo No MKV files found in the current directory.
+    exit /b 0
+)
+if defined failed exit /b 1
+exit /b 0
 
-:: In the end a file could contain these 4 basic cover art files:
-:: cover.jpg (portrait/square 600)
-:: small_cover.png (portrait/square 120)
-:: cover_land.png (landscape 600) 
-:: small_cover_land.jpg (landscape 120)
-:: 960x600 for landscape and 600x800 for portrait, 600x600 for square
+:attachCover
+set "mkvPath=%~1"
+set "basePath=%~dpn1"
+set "coverPath="
+if exist "%basePath%.png" set "coverPath=%basePath%.png"
+if not defined coverPath if exist "%basePath%.jpg" set "coverPath=%basePath%.jpg"
+if not defined coverPath if exist "cover.png" set "coverPath=%CD%\cover.png"
+if not defined coverPath if exist "cover.jpg" set "coverPath=%CD%\cover.jpg"
 
-::you can use a single cover.jpg image for all files or use a specific "filename.jpg" file if you have one
+if not defined coverPath (
+    echo No per-file or generic JPG/PNG cover found for "%mkvPath%". Skipping.
+    exit /b 0
+)
+
+for %%C in ("%coverPath%") do set "coverName=cover%%~xC"
+echo Attaching "%coverPath%" to "%mkvPath%"...
+mkvpropedit "%mkvPath%" --attachment-name "%coverName%" --add-attachment "%coverPath%"
+if errorlevel 1 (
+    echo Failed to attach cover to "%mkvPath%". Input images were retained.
+    exit /b 1
+)
+exit /b 0
