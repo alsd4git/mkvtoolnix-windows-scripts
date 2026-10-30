@@ -228,7 +228,7 @@ internal static class Program
     Assert-That ((Test-Path $matchedCover) -and (Test-Path $unrelatedImage)) 'Cover attachment deleted artwork.'
     $editArguments = Get-Content $editLog -Raw
     Assert-That ($editArguments.Contains($coverMkv) -and $editArguments.Contains($matchedCover)) 'The per-file cover or MKV path was not passed to mkvpropedit.'
-    Assert-That ($editArguments.Contains('--attachment-name "cover.png"')) 'Per-file artwork was not attached with the standard cover filename.'
+    Assert-That ($editArguments.Contains('--attachment-name|cover.png|')) 'Per-file artwork was not attached with the standard cover filename.'
     Assert-That ($editArguments.Contains($specialCoverMkv) -and $editArguments.Contains($specialCover)) 'Special-character artwork paths were not passed safely to mkvpropedit.'
 
     $genericDirectory = New-WorkingDirectory 'generic cover'
@@ -242,7 +242,7 @@ internal static class Program
     Assert-That (Test-Path $genericCover) 'Generic cover was deleted.'
     $editArguments = Get-Content $editLog -Raw
     Assert-That ($editArguments.Contains($genericCover)) 'Generic cover path was not passed to mkvpropedit.'
-    Assert-That ($editArguments.Contains('--attachment-name "cover.jpg"')) 'Generic artwork was not attached with the standard cover filename.'
+    Assert-That ($editArguments.Contains('--attachment-name|cover.jpg|')) 'Generic artwork was not attached with the standard cover filename.'
 
     $noCoverDirectory = New-WorkingDirectory 'missing cover'
     $noCoverMkv = Join-Path $noCoverDirectory 'no cover.mkv'
