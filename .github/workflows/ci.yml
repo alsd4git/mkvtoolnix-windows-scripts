@@ -45,3 +45,7 @@ jobs:
           if ($arguments -notmatch 'sample video') {
             throw "The single-file script did not pass the input path to mkvmerge."
           }
+
+      - name: Test non-destructive batch scripts with command stubs
+        shell: pwsh
+        run: ./tests/windows-safety.ps1
